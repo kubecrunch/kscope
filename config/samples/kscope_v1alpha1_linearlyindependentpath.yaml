@@ -1,0 +1,7 @@
+apiVersion: kscope.kubecrunch.com/v1alpha1
+kind: LinearlyIndependentPath
+metadata:
+  name: linearlyindependentpath-sample
+spec:
+  # Add fields here
+  foo: bar
