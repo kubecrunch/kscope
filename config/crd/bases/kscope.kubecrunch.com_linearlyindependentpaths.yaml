@@ -385,6 +385,82 @@ spec:
               type: string
           type: object
         spec:
+          properties:
+            bootstrapped_secrets:
+              items:
+                type: string
+              type: array
+            stages:
+              items:
+                properties:
+                  description:
+                    type: string
+                  name:
+                    type: string
+                  request:
+                    properties:
+                      body:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      headers:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      method:
+                        type: string
+                      url:
+                        type: string
+                    required:
+                    - method
+                    - body
+                    - headers
+                    - url
+                    type: object
+                  response:
+                    properties:
+                      expected_fields:
+                        items:
+                          type: string
+                        type: array
+                      max_permissible_latency:
+                        type: integer
+                      preserve_fields:
+                        items:
+                          properties:
+                            field_name:
+                              type: string
+                            key_name:
+                              type: string
+                            value_type:
+                              type: string
+                          required:
+                          - field_name
+                          - value_type
+                          - key_name
+                          type: object
+                        type: array
+                      status_code:
+                        type: integer
+                    required:
+                    - status_code
+                    - max_permissible_latency
+                    - expected_fields
+                    - preserve_fields
+                    type: object
+                  sequence_number:
+                    type: integer
+                required:
+                - name
+                - description
+                - sequence_number
+                - request
+                - response
+                type: object
+              type: array
+          required:
+          - stages
+          - bootstrapped_secrets
           type: object
         status:
           type: object

@@ -23,9 +23,44 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type KscopePreservedFields struct {
+	FieldName string `json:"field_name"`
+	ValueType string `json:"value_type"`
+	KeyName string `json:"key_name"`
+}
+
+// Duct stores information captured at various stages within a linearly Independent path so that it can be reused
+// ex. the first stage ie. sequence_nunber with 1 acquires jwt token which is used in later stages to make furhter api calls.
+//type Duct map[string]KscopePreservedFields
+
+// KscopeRequest is the http request
+type KscopeRequest struct {
+	Method  string            `json:"method"`
+	Body    map[string]string `json:"body"`
+	Headers map[string]string `json:"headers"`
+	Url     string            `json:"url"`
+}
+
+// KscopeResponse
+type KscopeResponse struct {
+	StatusCode            int                     `json:"status_code"`
+	MaxPermissibleLatency int                     `json:"max_permissible_latency"` // in milli seconds
+	ExpectedFields        []string                `json:"expected_fields"`         // in later versions .. regex checks can be made on values
+	PreserveFields        []KscopePreservedFields `json:"preserve_fields"`
+}
+
+type KscopeStage struct {
+	Name           string         `json:"name"`
+	Description    string         `json:"description"`
+	SequenceNumber int            `json:"sequence_number"`
+	Request        KscopeRequest  `json:"request"`
+	Response       KscopeResponse `json:"response"`
+}
+
 // LinearlyIndependentPathSpec defines the desired state of LinearlyIndependentPath
 type LinearlyIndependentPathSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	Stages []KscopeStage `json:"stages"`
+	BootStrappedSecrets []string `json:"bootstrapped_secrets"`
 	// Important: Run "make" to regenerate code after modifying this file
 }
 

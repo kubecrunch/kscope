@@ -3,5 +3,31 @@ kind: LinearlyIndependentPath
 metadata:
   name: linearlyindependentpath-sample
 spec:
-  # Add fields here
-  foo: bar
+  stages:
+    - sequence_number: 1
+      name: tokenizer
+      description: At this stage a token is acquired from identity service
+      request:
+        method: POST
+        body:
+          client_id: "{xyz}"
+          grant_type: password
+          scope: service
+          username: abc
+          password: "{passwd}"
+        headers:
+          Content-Type: application/json
+        url: https://something.org/identity
+      response:
+        status_code: 200
+        max_permissible_latency: 1000
+        expected_fields:
+          - scope
+          - token_type
+          - access_token
+          - expires_in
+        preserve_fields:
+          - key_name: user_access_token
+            field_name: access_token
+            value_type: string
+  bootstrapped_secrets: []
