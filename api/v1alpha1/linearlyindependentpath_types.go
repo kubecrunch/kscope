@@ -36,7 +36,7 @@ type KscopePreservedFields struct {
 // KscopeRequest is the http request
 type KscopeRequest struct {
 	Method  string            `json:"method"`
-	Body    map[string]string `json:"body"`
+	Body    string            `json:"body"`
 	Headers map[string]string `json:"headers"`
 	Url     string            `json:"url"`
 }
