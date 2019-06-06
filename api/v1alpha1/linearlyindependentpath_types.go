@@ -26,7 +26,7 @@ import (
 type KscopePreservedFields struct {
 	FieldName string `json:"field_name"`
 	ValueType string `json:"value_type"`
-	KeyName string `json:"key_name"`
+	KeyName   string `json:"key_name"`
 }
 
 // Duct stores information captured at various stages within a linearly Independent path so that it can be reused
@@ -59,8 +59,8 @@ type KscopeStage struct {
 
 // LinearlyIndependentPathSpec defines the desired state of LinearlyIndependentPath
 type LinearlyIndependentPathSpec struct {
-	Stages []KscopeStage `json:"stages"`
-	BootStrappedSecrets []string `json:"bootstrapped_secrets"`
+	Stages              []KscopeStage `json:"stages"`
+	BootStrappedSecrets []string      `json:"bootstrapped_secrets"`
 	// Important: Run "make" to regenerate code after modifying this file
 }
 

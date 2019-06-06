@@ -20,7 +20,7 @@ spec:
         url: https://something.org/identity
       response:
         status_code: 200
-        max_permissible_latency: 1000
+        max_permissible_latency: 100
         expected_fields:
           - scope
           - token_type
