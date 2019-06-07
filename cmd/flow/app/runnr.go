@@ -81,8 +81,13 @@ func loop(d time.Duration, flowCfg FlowConfiguration, duct *map[string]string) {
 		for _, stage := range flowCfg.Stages {
 			wg.Add(1)
 			ctx := context.Background()
-			handleStage(ctx, &wg, &stage, duct)
+			prom, err := handleStage(ctx, &wg, &stage, duct)
 			wg.Wait()
+			// publish the stage information to prometheus
+			fmt.Println(prom) // todo: remove me
+			if err != nil {
+				// cancel the flow of the LIP
+			}
 		}
 	}
 
@@ -154,11 +159,53 @@ func handleStage(ctx context.Context, wg *sync.WaitGroup, stage *v1alpha1.Kscope
 
 // check checks the response and preserves relevant fields for further stages
 func check(stage *v1alpha1.KscopeStage, response *http.Response, duct *map[string]string, prom *PrometheusMetricsHolder) {
-	// TODO: implement me
 	if response.StatusCode != stage.Response.StatusCode {
 		prom.ErrorMessage = "Error!! status code doesn't match."
 		return
 	}
+
+	responseBody, err := ioutil.ReadAll(response.Body)
+
+	if err != nil {
+		prom.ErrorMessage = "Error!! reading response body."
+		return
+	}
+
+	var responseMap interface{}
+	json.Unmarshal(responseBody, &responseMap)
+
+	fields := stage.Response.ExpectedFields
+
+	m := responseMap.(map[string]interface{})
+	for _, field := range fields {
+		chain := strings.Split(field, ".")
+		finalKey := chain[len(chain)-1]
+		for _, e := range chain[:len(chain)-1] {
+			if v, ok := m[e]; ok {
+				m = v.(map[string]interface{})
+
+			} else {
+				prom.ErrorMessage = fmt.Sprintf("Error!! field %s is not present.", field)
+				return
+			}
+
+		}
+		var v interface{}
+		v, ok := m[finalKey]
+
+		if !ok {
+			prom.ErrorMessage = fmt.Sprintf("Error!! field %s is not present.", field)
+			return
+		}
+		// check if field is also present in preserved fields
+		for _, p := range stage.Response.PreserveFields {
+			if p.FieldName == field {
+				(*duct)[field] = v.(string)
+			}
+		}
+
+	}
+
 }
 
 // visit visits a url and captures duration etc.
@@ -228,7 +275,7 @@ func loadConfig(flowCfg *FlowConfiguration, configLocation string) error {
 	return nil
 }
 
-func loadBootstrappedSecrets(res *map[string]string, loc string) (err error) {
+func loadBootstrappedSecrets(duct *map[string]string, loc string) (err error) {
 	if loc == "" {
 		loc = "/secrets/bootstrap.json"
 	}
@@ -239,8 +286,7 @@ func loadBootstrappedSecrets(res *map[string]string, loc string) (err error) {
 	if err != nil {
 		return err
 	}
-
-	if err = json.Unmarshal(data, res); err != nil {
+	if err = json.Unmarshal(data, duct); err != nil {
 		return err
 	}
 
