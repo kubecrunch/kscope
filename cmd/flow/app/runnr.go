@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -40,6 +39,7 @@ type PrometheusMetricsHolder struct {
 	Latency            int64  `json:"latency"`
 	AllowedLatency     int    `json:"allowed_latency"`
 	ErrorMessage       string `json:"error_message"`
+	ResponseText       string `json:"response_text"`
 }
 
 // TODO: use logging framework like logrus etc.
@@ -51,7 +51,7 @@ func NewFlowCommand() *cobra.Command {
 
 func run(cmd *cobra.Command, _ []string) {
 	// TODO: should come as a flag
-	configFile := "/config/stages.json"
+	configFile := "/tmp/config/stages.json"
 
 	cfg := FlowConfiguration{}
 
@@ -66,7 +66,7 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	// TODO: this should be configurable
-	loop(60000*time.Millisecond, cfg, &duct)
+	loop(10000*time.Millisecond, cfg, &duct)
 }
 
 // loop checks a Linearly independent path every d intervals
@@ -110,7 +110,8 @@ func handleStage(ctx context.Context, wg *sync.WaitGroup, stage *v1alpha1.Kscope
 	t := make(chan interface{})
 	headers := make(map[string]string)
 	for k, v := range stage.Request.Headers {
-		headers[k] = replaceParams(v, duct)
+		s := replaceParams(v, duct)
+		headers[k] = s
 	}
 
 	go func() {
@@ -120,11 +121,10 @@ func handleStage(ctx context.Context, wg *sync.WaitGroup, stage *v1alpha1.Kscope
 		case "GET":
 			response, duration := visit("GET", url, &headers, nil)
 			prom.ActualStatusCode = response.StatusCode
+			prom.ExpectedStatusCode = stage.Response.StatusCode
 			prom.Latency = int64(duration / time.Millisecond)
 
-			var responseBody interface{}
 			check(stage, response, duct, &prom)
-			fmt.Println(responseBody)
 
 		case "POST":
 			body, err := base64.StdEncoding.DecodeString(stage.Request.Body)
@@ -135,9 +135,10 @@ func handleStage(ctx context.Context, wg *sync.WaitGroup, stage *v1alpha1.Kscope
 			body = []byte(replaceParams(string(body), duct))
 
 			response, duration := visit("POST", url, &headers, body)
-
 			prom.ActualStatusCode = response.StatusCode
+			prom.ExpectedStatusCode = (*stage).Response.StatusCode
 			prom.Latency = int64(duration / time.Millisecond)
+			check(stage, response, duct, &prom)
 		case "PUT":
 			// handle PUT call
 		case "DELETE":
@@ -159,15 +160,14 @@ func handleStage(ctx context.Context, wg *sync.WaitGroup, stage *v1alpha1.Kscope
 
 // check checks the response and preserves relevant fields for further stages
 func check(stage *v1alpha1.KscopeStage, response *http.Response, duct *map[string]string, prom *PrometheusMetricsHolder) {
-	if response.StatusCode != stage.Response.StatusCode {
-		prom.ErrorMessage = "Error!! status code doesn't match."
-		return
-	}
-
 	responseBody, err := ioutil.ReadAll(response.Body)
-
+	prom.ResponseText = string(responseBody)
 	if err != nil {
 		prom.ErrorMessage = "Error!! reading response body."
+		return
+	}
+	if response.StatusCode != stage.Response.StatusCode {
+		prom.ErrorMessage = "Error!! status code doesn't match."
 		return
 	}
 
@@ -200,7 +200,7 @@ func check(stage *v1alpha1.KscopeStage, response *http.Response, duct *map[strin
 		// check if field is also present in preserved fields
 		for _, p := range stage.Response.PreserveFields {
 			if p.FieldName == field {
-				(*duct)[field] = v.(string)
+				(*duct)[p.KeyName] = v.(string)
 			}
 		}
 
@@ -259,16 +259,15 @@ func getParameters(b []byte) []string {
 }
 
 func loadConfig(flowCfg *FlowConfiguration, configLocation string) error {
-	configReader := viper.New()
 
-	configReader.SetConfigName("configuration")
-	configReader.SetConfigFile(configLocation)
-
-	if err := configReader.ReadInConfig(); err != nil {
+	if _, err := os.Stat(configLocation); os.IsNotExist(err) {
 		return err
 	}
-
-	if err := configReader.Unmarshal(flowCfg); err != nil {
+	data, err := ioutil.ReadFile(configLocation)
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(data, flowCfg); err != nil {
 		return err
 	}
 
@@ -277,7 +276,7 @@ func loadConfig(flowCfg *FlowConfiguration, configLocation string) error {
 
 func loadBootstrappedSecrets(duct *map[string]string, loc string) (err error) {
 	if loc == "" {
-		loc = "/secrets/bootstrap.json"
+		loc = "/tmp/secrets/bootstrap.json"
 	}
 	if _, err := os.Stat(loc); os.IsNotExist(err) {
 		return err
